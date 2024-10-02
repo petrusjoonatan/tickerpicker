@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 
 namespace Osakedata;
@@ -10,8 +9,8 @@ namespace Osakedata;
 /// A program that selects stocks or indices based on their technical indicators
 /// which meet the criteria for a good buying opportunity. Price data is fetched from Alphavantage API,
 /// and analysis is performed in the code. The program returns a list of stocks that fulfill all pre-defined criteria 
-/// for a favorable buying opportunity.
-/// The following indicators are used for the analysis: RSI, EMA50/SMA200 Golden Cross, Volume.
+/// for a favorable buying opportunity. Following indicators are used for the analysis: RSI, EMA50/SMA200 Golden Cross
+/// and volume action.
 /// </summary>
 /// @author Petrus Genas
 /// @version 0.00
@@ -104,11 +103,11 @@ public static class Program
             string emaKey = "\"EMA\": \"";
 
             // Check whether it's SMA or EMA
-            int startIndex = movingAverage.IndexOf(smaKey, StringComparison.Ordinal);
+            int startIndex = movingAverage.IndexOf(smaKey);
 
             if (startIndex == -1)
             {
-                startIndex = movingAverage.IndexOf(emaKey, StringComparison.Ordinal);
+                startIndex = movingAverage.IndexOf(emaKey);
                 if (startIndex == -1)
                 {
                     return "Error retrieving SMA or EMA";
