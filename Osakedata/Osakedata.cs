@@ -21,7 +21,7 @@ public static class Program
     /// </summary>
     private static void Main()
     {
-        string apiKey = "XIYAPYGZC2E7VFJU";
+        string apiKey = "";
         string symbol = "TSLA";
 
         // Prints the stock's latest price and volume for the most recent trading day
