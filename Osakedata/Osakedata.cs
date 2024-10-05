@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -21,9 +22,10 @@ public static class Program
     /// </summary>
     private static void Main()
     {
+        
         string apiKey = "";
         string symbol = "TSLA";
-
+        
         // Prints the stock's latest price and volume for the most recent trading day
         string printPriceAndVolume = GetPriceAndVolume(symbol, apiKey);
         Console.WriteLine(printPriceAndVolume);
@@ -36,15 +38,12 @@ public static class Program
         string printSimpleMovingAverages = GetMovingAverage("SMA", $"{symbol}", "daily", "200", apiKey);
         Console.WriteLine(printSimpleMovingAverages);
 
-        // Prints the stock's latest RSI for the most recent trading day
-        string printRelativeStrengthIndex = GetRelativeStrengthIndex(symbol, apiKey);
-        Console.WriteLine(printRelativeStrengthIndex);
-        
-        string comparedMovingAverages = CompareMovingAverages(printExponentialMovingAverages, printSimpleMovingAverages);
-        Console.WriteLine(comparedMovingAverages);
+    }
 
-        string checkedRelativeStrengthIndex = CheckRelativeStrengthIndex(symbol, apiKey);
-        Console.WriteLine(checkedRelativeStrengthIndex);
+    public static string[] GetTickers(string pathToFile)
+    {
+        string[] tickers = File.ReadAllLines(pathToFile);
+        return tickers;
     }
     
 
@@ -176,39 +175,51 @@ public static class Program
         return double.Parse(cleanedValue);
     }
 
-    private static string CompareMovingAverages(string ema, string sma)
+    /// <summary>
+    /// Compares two moving averages: the Exponential Moving Average (EMA50) and the Simple Moving Average (SMA200).
+    /// </summary>
+    /// <param name="ema">The Exponential Moving Average value</param>
+    /// <param name="sma">The Simple Moving Average value</param>
+    /// <returns>
+    /// <c>true</c> if the Exponential Moving Average is greater than or equal to the Simple Moving Average; 
+    /// <c>false</c> if the EMA is less than the SMA.
+    /// </returns>
+    private static bool CompareMovingAverages(string ema, string sma)
     {
-
+        
         double emaToBeCompared = CleanAndConvertToDouble(ema);
         double smaToBeCompared = CleanAndConvertToDouble(sma);
-        
-        string emaIsOverSma = "Ema on sma:n päällä";
-        string smaIsOverEma = "Sma on ema:n päällä";
 
         if (emaToBeCompared >= smaToBeCompared)
         {
-            return emaIsOverSma;
+            return true;
         }
         else
         {
-            return smaIsOverEma;
+            return false;
         }
     }
-
-    private static string CheckRelativeStrengthIndex(string symbol, string apiKey)
+    
+    /// <summary>
+    /// Determines whether the Relative Strength Index (RSI) for a given stock symbol is below or equal to 42
+    /// </summary>
+    /// <param name="symbol">Stock ticker, e.g., "TSLA".</param>
+    /// <param name="apiKey">API key for accessing Alphavantage data.</param>
+    /// <returns>
+    /// <c>true</c> if the Relative Strength Index (RSI) is less than or equal to 42; 
+    /// <c>false</c> if the RSI is greater than 42.
+    /// </returns>
+    private static bool CheckRelativeStrengthIndex(string symbol, string apiKey)
     {
         double relativeStrengthIndex= CleanAndConvertToDouble(GetRelativeStrengthIndex(symbol, apiKey));
 
-        string over = "RSI on yli 40";
-        string under = "RSI on alle 40";
-        
-        if (relativeStrengthIndex >= 40.0)
+        if (relativeStrengthIndex <= 42.0)
         {
-            return over;
+            return true;
         }
         else
         {
-            return under;
+            return false;
         }
         
     }
