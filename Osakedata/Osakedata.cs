@@ -23,27 +23,44 @@ public static class Program
     private static void Main()
     {
         
-        string apiKey = "";
-        string symbol = "TSLA";
+        string apiKey = "XIYAPYGZC2E7VFJU";
         
-        // Prints the stock's latest price and volume for the most recent trading day
-        string printPriceAndVolume = GetPriceAndVolume(symbol, apiKey);
-        Console.WriteLine(printPriceAndVolume);
-
-        // Prints the stock's latest EMA50 for the most recent trading day
-        string printExponentialMovingAverages = GetMovingAverage("EMA", $"{symbol}", "daily", "50", apiKey);
-        Console.WriteLine(printExponentialMovingAverages);
-
-        // Prints the stock's latest SMA200 for the most recent trading day
-        string printSimpleMovingAverages = GetMovingAverage("SMA", $"{symbol}", "daily", "200", apiKey);
-        Console.WriteLine(printSimpleMovingAverages);
-
+        string recommendations = GivePurchaseRecommendationFulfilled(GetTickers(), apiKey);
+        Console.WriteLine(recommendations);
+        
+    }
+    
+    public static string[] GetTickers()
+    {
+        string[] tickers = {"BABA", "MSFT", "NVDA"};
+        return tickers;
     }
 
-    public static string[] GetTickers(string pathToFile)
+    public static string GivePurchaseRecommendationFulfilled(string[] tickers, string apiKey)
     {
-        string[] tickers = File.ReadAllLines(pathToFile);
-        return tickers;
+        for (int i = 0; i < tickers.Length; i++)
+        {   
+            double stockEma = GetMovingAverage("ema", $"{tickers[i]}", "daily", "50", apiKey);
+            double stockSma = GetMovingAverage("sma", $"{tickers[i]}", "daily", "50", apiKey);
+            
+            if (CheckAllCriteria(tickers[i], apiKey, stockEma, stockSma))
+            {
+                string buyToday = $"Osta {tickers[i]} tänään!";
+                return buyToday;
+            }
+        }
+
+        return null;
+    }
+
+    public static bool CheckAllCriteria(string ticker, string apiKey, double ema, double sma)
+    {
+        if ((CheckRelativeStrengthIndex(ticker, apiKey)) && CompareMovingAverages(ema, sma))
+            return true;
+        else
+        {
+            return false;
+        }
     }
     
 
@@ -85,7 +102,7 @@ public static class Program
     /// <param name="timeperiod">Time period, e.g., 200 or 50.</param>
     /// <param name="apiKey">API key for accessing Alphavantage data.</param>
     /// <returns>Returns the moving average value (SMA or EMA).</returns>
-    private static string GetMovingAverage(string function, string symbol, string interval, string timeperiod, string apiKey)
+    private static double GetMovingAverage(string function, string symbol, string interval, string timeperiod, string apiKey)
     {
         string queryUrl =
             $"https://www.alphavantage.co/query?function={function}&symbol={symbol}&interval={interval}&time_period={timeperiod}&series_type=open&apikey={apiKey}";
@@ -97,7 +114,7 @@ public static class Program
             // Fetch moving average data
             string movingAverage = client.DownloadString(queryUri);
 
-            // Define the keys for SMA and EMA in the data
+            // Define the keys for SMA and EMA in the data.
             string smaKey = "\"SMA\": \"";
             string emaKey = "\"EMA\": \"";
 
@@ -109,7 +126,7 @@ public static class Program
                 startIndex = movingAverage.IndexOf(emaKey);
                 if (startIndex == -1)
                 {
-                    return "Error retrieving SMA or EMA";
+                    return Double.MaxValue;
                 }
                 // If EMA is found, proceed with that
                 startIndex += emaKey.Length;
@@ -121,12 +138,13 @@ public static class Program
             }
 
             // Find the closing quote for the SMA or EMA value
-            int endIndex = movingAverage.IndexOf("\"", startIndex);
-            if (endIndex == -1) return "Error retrieving SMA or EMA";
+            int endIndex = movingAverage.IndexOf("\"", startIndex); 
+            if (endIndex == -1) return double.MaxValue;
 
             // Return the SMA or EMA value
-            string returnMovingAverage = movingAverage.Substring(startIndex, endIndex - startIndex);
-            return returnMovingAverage;
+            string movingAverageString = movingAverage.Substring(startIndex, endIndex - startIndex);
+            double movingAverageDouble = CleanAndConvertToDouble(movingAverageString);
+            return movingAverageDouble;
         }
     }
 
@@ -136,7 +154,7 @@ public static class Program
     /// <param name="symbol">Stock ticker, e.g., "TSLA".</param>
     /// <param name="apiKey">API key for accessing Alphavantage data.</param>
     /// <returns>Returns the RSI value.</returns>
-    private static string GetRelativeStrengthIndex(string symbol, string apiKey)
+    private static double GetRelativeStrengthIndex(string symbol, string apiKey)
     {
         string queryUrl =
             $"https://www.alphavantage.co/query?function=RSI&symbol={symbol}&interval=daily&time_period=14&series_type=close&apikey={apiKey}";
@@ -152,14 +170,17 @@ public static class Program
             string rsiKey = "\"RSI\": \"";
             int startIndex = relativeStrengthIndex.IndexOf(rsiKey);
 
-            if (startIndex == -1) return "Error retrieving RSI";
+            if (startIndex == -1) return Double.MaxValue;
             startIndex += rsiKey.Length;
 
             int endIndex = relativeStrengthIndex.IndexOf("\"", startIndex);
-            if (endIndex == -1) return "Error retrieving RSI";
+            if (endIndex == -1) return Double.MaxValue;
 
             // Return the RSI value
-            return relativeStrengthIndex.Substring(startIndex, endIndex - startIndex);
+            string rsiString = relativeStrengthIndex.Substring(startIndex, endIndex - startIndex);
+            double rsiDouble = CleanAndConvertToDouble(rsiString);
+            
+            return rsiDouble;
         }
     }
     
@@ -184,13 +205,10 @@ public static class Program
     /// <c>true</c> if the Exponential Moving Average is greater than or equal to the Simple Moving Average; 
     /// <c>false</c> if the EMA is less than the SMA.
     /// </returns>
-    private static bool CompareMovingAverages(string ema, string sma)
+    private static bool CompareMovingAverages(double ema, double sma)
     {
         
-        double emaToBeCompared = CleanAndConvertToDouble(ema);
-        double smaToBeCompared = CleanAndConvertToDouble(sma);
-
-        if (emaToBeCompared >= smaToBeCompared)
+        if (ema >= sma)
         {
             return true;
         }
@@ -211,7 +229,7 @@ public static class Program
     /// </returns>
     private static bool CheckRelativeStrengthIndex(string symbol, string apiKey)
     {
-        double relativeStrengthIndex= CleanAndConvertToDouble(GetRelativeStrengthIndex(symbol, apiKey));
+        double relativeStrengthIndex = GetRelativeStrengthIndex(symbol, apiKey);
 
         if (relativeStrengthIndex <= 42.0)
         {
