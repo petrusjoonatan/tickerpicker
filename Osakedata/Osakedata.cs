@@ -7,41 +7,48 @@ using System.Text.RegularExpressions;
 namespace Osakedata;
 
 /// <summary>
-/// A program that selects stocks or indices based on their technical indicators
-/// which meet the criteria for a good buying opportunity. Price data is fetched from Alphavantage API,
-/// and analysis is performed in the code. The program returns a list of stocks that fulfill all pre-defined criteria 
-/// for a favorable buying opportunity. Following indicators are used for the analysis: RSI, EMA50/SMA200 Golden Cross
-/// and volume action.
+/// This program provides stock buying recommendations based on technical indicators that meet
+/// specific criteria for favorable buying opportunities. The stock price data is
+/// retrieved from the AlphaVantage API, and the analysis is conducted within the code.
+/// The analysis is based on the following technical indicators: RSI, EMA, SMA and VOLUME
+/// Program returns stocks that fulfill all these criteria.
 /// </summary>
 /// @author Petrus Genas
 /// @version 0.00
 public static class Program
 {
     /// <summary>
-    /// Main function retrieves stock price and technical indicator data through methods and analyzes them.
+    /// Main triggers the process of fetching stock data and making buy recommendations.
     /// </summary>
     private static void Main()
     {
-        
         string apiKey = "XIYAPYGZC2E7VFJU";
-        
         string recommendations = GivePurchaseRecommendationFulfilled(GetTickers(), apiKey);
         Console.WriteLine(recommendations);
-        
     }
     
+    /// <summary>
+    /// Returns all stock tickers as an array to be checked for criteria in the analysis.
+    /// </summary>
+    /// <returns>An array of stock ticker symbols.</returns>
     public static string[] GetTickers()
     {
-        string[] tickers = {"BABA", "MSFT", "NVDA"};
+        string[] tickers = {"MSFT"};
         return tickers;
     }
-
+    
+    /// <summary>
+    /// Analyzes the given stock tickers and provides a purchase recommendation for those that meet all criteria.
+    /// </summary>
+    /// <param name="tickers">Array of stock ticker symbols to analyze.</param>
+    /// <param name="apiKey">API key for accessing Alphavantage data.</param>
+    /// <returns>A recommendation string if any stock meets all criteria.</returns>
     public static string GivePurchaseRecommendationFulfilled(string[] tickers, string apiKey)
     {
         for (int i = 0; i < tickers.Length; i++)
         {   
             double stockEma = GetMovingAverage("ema", $"{tickers[i]}", "daily", "50", apiKey);
-            double stockSma = GetMovingAverage("sma", $"{tickers[i]}", "daily", "50", apiKey);
+            double stockSma = GetMovingAverage("sma", $"{tickers[i]}", "daily", "200", apiKey);
             
             if (CheckAllCriteria(tickers[i], apiKey, stockEma, stockSma))
             {
@@ -50,9 +57,17 @@ public static class Program
             }
         }
 
-        return null;
+        return "Istu käsien päällä, tänään ei mitään ostettavaa!";
     }
-
+    
+    /// <summary>
+    /// Checks if the stock meets all defined criteria
+    /// </summary>
+    /// <param name="ticker">Stock ticker, e.g., "TSLA".</param>
+    /// <param name="apiKey">API key for accessing AlphaVantage data.</param>
+    /// <param name="ema">The Exponential Moving Average value</param>
+    /// <param name="sma">The Simple Moving Average value</param>
+    /// <returns><c>true</c> if the stock fulfills all criteria; otherwise, <c>false</c>.</returns>
     public static bool CheckAllCriteria(string ticker, string apiKey, double ema, double sma)
     {
         if ((CheckRelativeStrengthIndex(ticker, apiKey)) && CompareMovingAverages(ema, sma))
@@ -62,7 +77,6 @@ public static class Program
             return false;
         }
     }
-    
 
     /// <summary>
     /// Retrieves the latest price and volume data for the specified stock ticker.
@@ -111,14 +125,11 @@ public static class Program
 
         using WebClient client = new WebClient();
         {
-            // Fetch moving average data
             string movingAverage = client.DownloadString(queryUri);
-
-            // Define the keys for SMA and EMA in the data.
+            
             string smaKey = "\"SMA\": \"";
             string emaKey = "\"EMA\": \"";
-
-            // Check whether it's SMA or EMA
+            
             int startIndex = movingAverage.IndexOf(smaKey);
 
             if (startIndex == -1)
@@ -163,10 +174,8 @@ public static class Program
 
         using (WebClient client = new WebClient())
         {
-            // Fetch RSI data
             string relativeStrengthIndex = client.DownloadString(queryUri);
-
-            // Store the key where the RSI value is found
+            
             string rsiKey = "\"RSI\": \"";
             int startIndex = relativeStrengthIndex.IndexOf(rsiKey);
 
@@ -174,9 +183,9 @@ public static class Program
             startIndex += rsiKey.Length;
 
             int endIndex = relativeStrengthIndex.IndexOf("\"", startIndex);
+            
             if (endIndex == -1) return Double.MaxValue;
-
-            // Return the RSI value
+            
             string rsiString = relativeStrengthIndex.Substring(startIndex, endIndex - startIndex);
             double rsiDouble = CleanAndConvertToDouble(rsiString);
             
@@ -231,7 +240,7 @@ public static class Program
     {
         double relativeStrengthIndex = GetRelativeStrengthIndex(symbol, apiKey);
 
-        if (relativeStrengthIndex <= 42.0)
+        if (relativeStrengthIndex <= 60.0)
         {
             return true;
         }
@@ -239,8 +248,5 @@ public static class Program
         {
             return false;
         }
-        
     }
-
-
 }
