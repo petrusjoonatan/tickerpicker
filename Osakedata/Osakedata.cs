@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -22,7 +21,7 @@ public static class Program
     /// </summary>
     private static void Main()
     {
-        string apiKey = "XIYAPYGZC2E7VFJU";
+        string apiKey = "";
         string recommendations = GivePurchaseRecommendationFulfilled(GetTickers(), apiKey);
         Console.WriteLine(recommendations);
     }
@@ -33,7 +32,7 @@ public static class Program
     /// <returns>An array of stock ticker symbols.</returns>
     public static string[] GetTickers()
     {
-        string[] tickers = {"MSFT"};
+        string[] tickers = {"TSLA"};
         return tickers;
     }
     
@@ -59,7 +58,7 @@ public static class Program
 
         return "Istu käsien päällä, tänään ei mitään ostettavaa!";
     }
-    
+
     /// <summary>
     /// Checks if the stock meets all defined criteria
     /// </summary>
@@ -70,52 +69,70 @@ public static class Program
     /// <returns><c>true</c> if the stock fulfills all criteria; otherwise, <c>false</c>.</returns>
     public static bool CheckAllCriteria(string ticker, string apiKey, double ema, double sma)
     {
-        if ((CheckRelativeStrengthIndex(ticker, apiKey)) && CompareMovingAverages(ema, sma))
+        if ((CheckRelativeStrengthIndex(ticker, apiKey)) && CompareMovingAverages(ema, sma) && CompareVolume(ticker, apiKey))
             return true;
         else
         {
             return false;
         }
     }
-
+    
     /// <summary>
-    /// Retrieves the latest price and volume data for the specified stock ticker.
+    /// Checks if today's trading volume is greater than the 10-day average volume for a specified stock.
     /// </summary>
-    /// <param name="symbol">Stock ticker, e.g., "TSLA".</param>
-    /// <param name="apiKey">API key for accessing Alphavantage data.</param>
-    /// <returns>Returns price and volume data for the stock.</returns>
-    private static string GetPriceAndVolume(string symbol, string apiKey)
+    /// <param name="symbol">The stock ticker symbol, e.g., "TSLA".</param>
+    /// <param name="apiKey">API key for accessing AlphaVantage data.</param>
+    /// <returns><c>true</c> if today's volume is greater than the 10-day average; otherwise, <c>false</c>.</returns>
+    public static bool CompareVolume(string symbol, string apiKey)
     {
         string queryUrl =
             $"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&apikey={apiKey}";
 
         Uri queryUri = new Uri(queryUrl);
 
+        double[] volumes = new double[10];
+
         using (WebClient client = new WebClient())
         {
-            // Fetch price data
             string pricedata = client.DownloadString(queryUri);
 
-            // Split data into an array based on newline characters
-            string[] lines = pricedata.Split('\n');
-            
-            // Extract relevant rows containing the latest trading day's price and volume
-            string data = string.Join("\n", lines.Skip(10).Take(5));
+            string keyWord = "\"5. volume\": \"";
 
-            // Return the selected rows
-            return data;
+            int startIndex = pricedata.IndexOf("\"5. volume\": \"", StringComparison.Ordinal) + keyWord.Length;
+
+            int endIndex = pricedata.IndexOf('\"', startIndex);
+
+            for (int i = 0; i < volumes.Length; i++)
+            {
+                string volumeInString = pricedata.Substring(startIndex, endIndex - startIndex);
+                double volume = CleanAndConvertToDouble(volumeInString);
+                volumes[i] = volume;
+                startIndex = pricedata.IndexOf("\"5. volume\": \"", endIndex + 1, StringComparison.Ordinal) + keyWord.Length;
+                endIndex = pricedata.IndexOf('\"', startIndex);
+            }
+        }
+        
+        double tenDayAverageVolume = volumes.Take(10).Average();
+
+        if (volumes[0] > tenDayAverageVolume)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
         }
     }
-
+    
     /// <summary>
-    /// Retrieves the moving average for the specified stock ticker, type, interval, and time period.
+    /// Retrieves the moving average (either SMA or EMA) for the specified stock symbol, interval, and time period.
     /// </summary>
-    /// <param name="function">Type of moving average (SMA or EMA).</param>
-    /// <param name="symbol">Stock ticker, e.g., "TSLA".</param>
-    /// <param name="interval">Interval, e.g., "daily" or "5min".</param>
-    /// <param name="timeperiod">Time period, e.g., 200 or 50.</param>
-    /// <param name="apiKey">API key for accessing Alphavantage data.</param>
-    /// <returns>Returns the moving average value (SMA or EMA).</returns>
+    /// <param name="function">The type of moving average to retrieve, e.g., "sma" or "ema".</param>
+    /// <param name="symbol">The stock ticker symbol, e.g., "TSLA".</param>
+    /// <param name="interval">The interval for the moving average, e.g., "daily" or "5min".</param>
+    /// <param name="timeperiod">The time period over which the average is calculated, e.g., "50" or "200".</param>
+    /// <param name="apiKey">API key for accessing AlphaVantage data.</param>
+    /// <returns>The requested moving average as a double.</returns>
     private static double GetMovingAverage(string function, string symbol, string interval, string timeperiod, string apiKey)
     {
         string queryUrl =
@@ -130,29 +147,20 @@ public static class Program
             string smaKey = "\"SMA\": \"";
             string emaKey = "\"EMA\": \"";
             
-            int startIndex = movingAverage.IndexOf(smaKey);
+            int startIndex = movingAverage.IndexOf(smaKey, StringComparison.Ordinal);
 
             if (startIndex == -1)
             {
-                startIndex = movingAverage.IndexOf(emaKey);
-                if (startIndex == -1)
-                {
-                    return Double.MaxValue;
-                }
-                // If EMA is found, proceed with that
+                startIndex = movingAverage.IndexOf(emaKey, StringComparison.Ordinal);
                 startIndex += emaKey.Length;
             }
             else
             {
-                // If SMA is found, proceed with that
                 startIndex += smaKey.Length;
             }
-
-            // Find the closing quote for the SMA or EMA value
-            int endIndex = movingAverage.IndexOf("\"", startIndex); 
-            if (endIndex == -1) return double.MaxValue;
-
-            // Return the SMA or EMA value
+            
+            int endIndex = movingAverage.IndexOf("\"", startIndex, StringComparison.Ordinal);
+            
             string movingAverageString = movingAverage.Substring(startIndex, endIndex - startIndex);
             double movingAverageDouble = CleanAndConvertToDouble(movingAverageString);
             return movingAverageDouble;
@@ -160,11 +168,11 @@ public static class Program
     }
 
     /// <summary>
-    /// Retrieves the Relative Strength Index (RSI) for the specified stock ticker.
+    /// Retrieves the Relative Strength Index (RSI) for the specified stock ticker and returns its value.
     /// </summary>
-    /// <param name="symbol">Stock ticker, e.g., "TSLA".</param>
-    /// <param name="apiKey">API key for accessing Alphavantage data.</param>
-    /// <returns>Returns the RSI value.</returns>
+    /// <param name="symbol">The stock ticker symbol, e.g., "TSLA".</param>
+    /// <param name="apiKey">API key for accessing AlphaVantage data.</param>
+    /// <returns>The RSI value as a <c>double</c>; returns <c>double.MaxValue</c> if retrieval fails.</returns>
     private static double GetRelativeStrengthIndex(string symbol, string apiKey)
     {
         string queryUrl =
@@ -177,12 +185,13 @@ public static class Program
             string relativeStrengthIndex = client.DownloadString(queryUri);
             
             string rsiKey = "\"RSI\": \"";
-            int startIndex = relativeStrengthIndex.IndexOf(rsiKey);
+            
+            int startIndex = relativeStrengthIndex.IndexOf(rsiKey, StringComparison.Ordinal);
 
             if (startIndex == -1) return Double.MaxValue;
             startIndex += rsiKey.Length;
 
-            int endIndex = relativeStrengthIndex.IndexOf("\"", startIndex);
+            int endIndex = relativeStrengthIndex.IndexOf("\"", startIndex, StringComparison.Ordinal);
             
             if (endIndex == -1) return Double.MaxValue;
             
@@ -240,7 +249,7 @@ public static class Program
     {
         double relativeStrengthIndex = GetRelativeStrengthIndex(symbol, apiKey);
 
-        if (relativeStrengthIndex <= 60.0)
+        if (relativeStrengthIndex <= 42.0)
         {
             return true;
         }
